@@ -2,7 +2,7 @@
 
 ## Live Dashboard
 
-[![Open Dashboard](https://img.shields.io/badge/Streamlit-Dashboard-red?logo=streamlit&style=for-the-badge)](https://assistive-device-dashboard-r2syjajgp3broag4y2zea3.streamlit.app/)
+[![Open Dashboard](https://img.shields.io/badge/Streamlit-Dashboard-red?logo=streamlit&style=for-the-badge)](https://data-dashboard-f2ggz5con9d2gn2urcvceu.streamlit.app/)
 
 Streamlit dashboard for reviewing assistive device demand across three live assessment sources:
 
@@ -188,36 +188,6 @@ Bedridden records do not currently provide palm measurements, so they mainly con
 
 - Streamlit auto-refresh: hourly
 - data cache TTL: hourly
-
-## Run Locally
-
-Install dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-Run the dashboard:
-
-```bash
-streamlit run app.py
-```
-
-If port `8501` is already in use:
-
-```bash
-streamlit run app.py --server.port 8502
-```
-
-## Deployment Notes
-
-Keep the device catalog inside the repository at:
-
-```text
-data/DEVICE_INFORMATION_CATALOG_FINAL.xlsx
-```
-
-This is required for hosted deployments such as Streamlit Community Cloud, because local Windows paths are not available there.
 
 ## Dependencies
 
