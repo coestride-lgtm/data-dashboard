@@ -564,6 +564,39 @@ def value_counts_frame(df, source_col, label_col, limit=None):
     return counts
 
 
+def learner_key_frame(df):
+    if df.empty:
+        return df.copy()
+
+    keyed = df.copy()
+    record_type = keyed.get("Record Type", pd.Series("", index=keyed.index)).fillna("").astype(str)
+    school_id = keyed.get("School ID", pd.Series("", index=keyed.index)).fillna("").map(normalize_key)
+    school_name = keyed.get("School_Name", pd.Series("", index=keyed.index)).fillna("").map(normalize_key)
+    district = keyed.get("District", pd.Series("", index=keyed.index)).fillna("").map(normalize_key)
+    student = keyed.get("Student Name", pd.Series("", index=keyed.index)).fillna("").map(normalize_key)
+    contact = keyed.get("Contact No", pd.Series("", index=keyed.index)).fillna("").map(normalize_key)
+
+    school_scope = school_id.where(school_id.ne(""), school_name)
+    person_scope = contact.where(contact.ne(""), student)
+    fallback = pd.Series(keyed.index, index=keyed.index).astype(str)
+    person_scope = person_scope.where(person_scope.ne(""), fallback)
+
+    keyed["_Learner Key"] = record_type + "|" + district + "|" + school_scope + "|" + person_scope
+    return keyed
+
+
+def distinct_learner_counts_frame(df, source_col, label_col, limit=None):
+    if df.empty or source_col not in df.columns:
+        return pd.DataFrame(columns=[label_col, "Learners"])
+
+    learner_rows = learner_key_frame(df).drop_duplicates("_Learner Key")
+    counts = learner_rows[source_col].fillna("Unknown").astype(str).value_counts().reset_index()
+    counts.columns = [label_col, "Learners"]
+    if limit:
+        counts = counts.head(limit)
+    return counts
+
+
 def normalize_device_name(value):
     device = clean_text(value, "").strip().lower()
     return DEVICE_NAME_MAP.get(device, device)
@@ -665,7 +698,7 @@ def render_insight(label, value, note):
     )
 
 
-def make_horizontal_bar(df, x_col, y_col, color_col="Requests", height=380):
+def make_horizontal_bar(df, x_col, y_col, color_col="Requests", height=380, xaxis_title="Requests"):
     chart_df = df.sort_values(x_col, ascending=True).copy()
     chart_df["Display label"] = chart_df.apply(
         lambda row: f"{row[y_col]} ({fmt_number(row[x_col])})",
@@ -686,9 +719,9 @@ def make_horizontal_bar(df, x_col, y_col, color_col="Requests", height=380):
         texttemplate="%{text:,}",
         textposition="outside",
         cliponaxis=False,
-        hovertemplate=f"{y_col}: %{{customdata[0]}}<br>Requests: %{{customdata[1]:,}}<extra></extra>",
+        hovertemplate=f"{y_col}: %{{customdata[0]}}<br>{xaxis_title}: %{{customdata[1]:,}}<extra></extra>",
     )
-    fig.update_layout(xaxis_title="Requests", yaxis_title=None)
+    fig.update_layout(xaxis_title=xaxis_title, yaxis_title=None)
     fig.update_yaxes(categoryorder="array", categoryarray=chart_df["Display label"].tolist())
     return style_chart(fig, height=height)
 
@@ -1226,9 +1259,10 @@ with metric_4:
 
 st.markdown('<div class="section-title">Executive focus</div>', unsafe_allow_html=True)
 
-gender_counts = value_counts_frame(filtered_df, "Gender", "Gender")
-female_count = int(gender_counts.loc[gender_counts["Gender"] == "Female", "Requests"].sum())
-male_count = int(gender_counts.loc[gender_counts["Gender"] == "Male", "Requests"].sum())
+learner_gender_counts = distinct_learner_counts_frame(filtered_df, "Gender", "Gender")
+female_count = int(learner_gender_counts.loc[learner_gender_counts["Gender"] == "Female", "Learners"].sum())
+male_count = int(learner_gender_counts.loc[learner_gender_counts["Gender"] == "Male", "Learners"].sum())
+learner_total = int(learner_key_frame(filtered_df)["_Learner Key"].nunique()) if not filtered_df.empty else 0
 category_counts = value_counts_frame(filtered_df, "Device Category", "Category")
 leading_category = category_counts.iloc[0]["Category"] if not category_counts.empty else "No data"
 leading_category_count = int(category_counts.iloc[0]["Requests"]) if not category_counts.empty else 0
@@ -1251,7 +1285,7 @@ with focus_3:
     render_insight(
         "Gender distribution",
         f"{fmt_number(male_count)} male / {fmt_number(female_count)} female",
-        f"Female share: {fmt_percent(female_count, total_requests)}.",
+        f"Female share: {fmt_percent(female_count, learner_total)}.",
     )
 
 overview_tab, institutes_tab, bedridden_tab, profile_tab, size_tab, data_tab = st.tabs(
@@ -1419,25 +1453,43 @@ with institutes_tab:
 with profile_tab:
     st.markdown('<div class="section-title">Learner profile</div>', unsafe_allow_html=True)
 
-    disability_counts = value_counts_frame(filtered_df, "disability_cleaned", "Disability", top_n)
-    social_counts = value_counts_frame(filtered_df, "Social Category", "Social category", top_n)
+    disability_counts = distinct_learner_counts_frame(filtered_df, "disability_cleaned", "Disability", top_n)
+    social_counts = distinct_learner_counts_frame(filtered_df, "Social Category", "Social category", top_n)
 
     left, right = st.columns(2)
     with left:
         st.markdown("#### Disability profile")
-        st.plotly_chart(make_horizontal_bar(disability_counts, "Requests", "Disability"), width="stretch")
+        st.plotly_chart(
+            make_horizontal_bar(
+                disability_counts,
+                "Learners",
+                "Disability",
+                color_col="Learners",
+                xaxis_title="Learners",
+            ),
+            width="stretch",
+        )
 
     with right:
         st.markdown("#### Social category")
-        st.plotly_chart(make_horizontal_bar(social_counts, "Requests", "Social category"), width="stretch")
+        st.plotly_chart(
+            make_horizontal_bar(
+                social_counts,
+                "Learners",
+                "Social category",
+                color_col="Learners",
+                xaxis_title="Learners",
+            ),
+            width="stretch",
+        )
 
     left, right = st.columns(2)
     with left:
         st.markdown("#### Gender distribution")
         fig = px.pie(
-            gender_counts,
+            learner_gender_counts,
             names="Gender",
-            values="Requests",
+            values="Learners",
             color="Gender",
             color_discrete_map=GENDER_COLORS,
             hole=0.58,
@@ -1446,7 +1498,7 @@ with profile_tab:
             marker=dict(line=dict(color="#ffffff", width=2)),
             texttemplate="%{label}<br>%{percent}",
             textfont=dict(color=COLORS["ink"], size=13),
-            hovertemplate="%{label}<br>%{value:,} requests<extra></extra>",
+            hovertemplate="%{label}<br>%{value:,} learners<extra></extra>",
         )
         st.plotly_chart(style_chart(fig, height=350), width="stretch")
 
