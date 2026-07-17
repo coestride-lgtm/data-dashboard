@@ -536,7 +536,7 @@ def load_last_year_data_streamlit(source_url):
                     "Device": device,
                     "Device Category": DEVICE_CATEGORY_MAP.get(device, "Other"),
                     "Requests": int(requests),
-                    "Data Source": "Last year collected",
+                    "Data Source": "Phase 1",
                     "Record Type": "Last Year",
                 }
             )
@@ -580,7 +580,7 @@ def load_last_year_data_streamlit(source_url):
     learner_df["Social Category"] = "Unknown"
     learner_df["Priority"] = "Collected"
     learner_df["Record Type"] = "Last Year"
-    learner_df["Data Source"] = "Last year collected"
+    learner_df["Data Source"] = "Phase 1"
 
     return unit_df, learner_df.reindex(columns=learner_columns)
 
@@ -1121,7 +1121,14 @@ if "kpi_basis" not in st.session_state:
 if "analysis_scope" not in st.session_state:
     st.session_state["analysis_scope"] = "Combined"
 if "dashboard_year" not in st.session_state:
-    st.session_state["dashboard_year"] = "Current year"
+    st.session_state["dashboard_year"] = "All phases"
+else:
+    st.session_state["dashboard_year"] = {
+        "Current year": "Phase 2",
+        "Last year collected": "Phase 1",
+        "All years": "Phases",
+        "Phases": "All phases",
+    }.get(st.session_state["dashboard_year"], st.session_state["dashboard_year"])
 
 st.sidebar.markdown(
     """
@@ -1136,13 +1143,14 @@ if st.sidebar.button("Refresh data"):
 
 st.sidebar.divider()
 
-dashboard_year = st.sidebar.selectbox(
-    "Dashboard",
-    options=["Current year", "All years", "Last year collected"],
+dashboard_choice = st.sidebar.radio(
+    "Phase",
+    options=["All phases", "Phase 2", "Phase 1"],
     key="dashboard_year",
 )
+dashboard_year = {"All phases": "Phases", "Phase 2": "Phase 2", "Phase 1": "Phase 1"}[dashboard_choice]
 
-if dashboard_year == "Last year collected":
+if dashboard_year == "Phase 1":
     districts = sorted(last_year_units_df["District"].dropna().unique()) if not last_year_units_df.empty else []
     selected_districts = render_slicer("Districts", districts, "last_year_districts_filter", "Choose districts")
 
@@ -1185,7 +1193,7 @@ if dashboard_year == "Last year collected":
     st.markdown(
         f"""
             <div class="app-hero">
-                <div class="eyebrow">Last year collected devices</div>
+                <div class="eyebrow">Phase 1 collected devices</div>
                 <h1 class="hero-title">Assistive Device Collection Dashboard</h1>
                 <div class="status-row">
                     <span class="status-pill">Source: SharePoint workbook</span>
@@ -1202,7 +1210,7 @@ if dashboard_year == "Last year collected":
         st.markdown(
             """
             <div class="empty-state">
-                No last-year collected device records match the current filters.
+                No Phase 1 collected device records match the current filters.
             </div>
             """,
             unsafe_allow_html=True,
@@ -1211,7 +1219,7 @@ if dashboard_year == "Last year collected":
 
     metric_1, metric_2, metric_3, metric_4 = st.columns(4)
     with metric_1:
-        render_metric("Device units", fmt_number(last_year_total), "Collected last year")
+        render_metric("Device units", fmt_number(last_year_total), "Phase 1 collected")
     with metric_2:
         render_metric("Students", fmt_number(last_year_students), "Consolidated records")
     with metric_3:
@@ -1270,7 +1278,7 @@ if dashboard_year == "Last year collected":
             width="stretch",
         )
 
-    st.markdown("#### Last year collected data")
+    st.markdown("#### Phase 1 collected data")
     display_cols = [
         col
         for col in [
@@ -1307,7 +1315,7 @@ source_base_df = {
     "Bedridden": bedridden_df,
     "Institutes": cdc_df.rename(columns={"Requests": "Request Count"}),
 }[analysis_scope]
-if dashboard_year == "All years":
+if dashboard_year == "Phases":
     source_base_df = pd.concat([source_base_df, last_year_learners_df], ignore_index=True, sort=False)
 
 districts = sorted(source_base_df["District"].dropna().unique())
@@ -1385,7 +1393,7 @@ cdc_filtered = cdc_df[
 ].copy()
 
 include_last_year_units = (
-    dashboard_year != "All years"
+    dashboard_year != "Phases"
     or ("Collected" in set(selected_priorities) and "Unknown" in set(selected_genders))
 )
 last_year_current_filter = (
@@ -1412,15 +1420,15 @@ last_year_profile_filter = last_year_learners_df[
 current_demand_df = filtered_df.copy()
 if not current_demand_df.empty:
     current_demand_df["Requests"] = 1
-    current_demand_df["Year"] = "Current year"
+    current_demand_df["Phase"] = "Phase 2"
 institute_demand_df = cdc_filtered.copy()
 if not institute_demand_df.empty:
     institute_demand_df["Priority"] = "Institute"
-    institute_demand_df["Year"] = "Current year"
+    institute_demand_df["Phase"] = "Phase 2"
 last_year_demand_df = last_year_current_filter.copy()
 if not last_year_demand_df.empty:
-    last_year_demand_df["Priority"] = "Collected last year"
-    last_year_demand_df["Year"] = "Last year collected"
+    last_year_demand_df["Priority"] = "Phase 1 collected"
+    last_year_demand_df["Phase"] = "Phase 1"
 
 all_year_demand_df = (
     pd.concat(
@@ -1432,16 +1440,16 @@ all_year_demand_df = (
         ignore_index=True,
         sort=False,
     )
-    if dashboard_year == "All years"
+    if dashboard_year == "Phases"
     else pd.DataFrame()
 )
 all_year_profile_df = (
     pd.concat([filtered_df, last_year_profile_filter], ignore_index=True, sort=False)
-    if dashboard_year == "All years"
+    if dashboard_year == "Phases"
     else filtered_df
 )
-demand_view_df = all_year_demand_df if dashboard_year == "All years" else filtered_df
-profile_view_df = all_year_profile_df if dashboard_year == "All years" else filtered_df
+demand_view_df = all_year_demand_df if dashboard_year == "Phases" else filtered_df
+profile_view_df = all_year_profile_df if dashboard_year == "Phases" else filtered_df
 all_year_total_requests = int(all_year_demand_df["Requests"].sum()) if not all_year_demand_df.empty else 0
 
 cdc_requests = int(cdc_filtered["Requests"].sum()) if not cdc_filtered.empty else 0
@@ -1522,7 +1530,7 @@ else:
             scope_count_label = "records"
     priority_value = priority_one
 
-if dashboard_year == "All years":
+if dashboard_year == "Phases":
     total_requests = all_year_total_requests
     display_total_requests = all_year_total_requests
     all_year_device_counts = demand_counts_frame(all_year_demand_df, "Device", "Device")
@@ -1567,10 +1575,10 @@ st.markdown(
 )
 
 if (
-    dashboard_year == "All years"
+    dashboard_year == "Phases"
     and all_year_demand_df.empty
 ) or (
-    dashboard_year != "All years"
+    dashboard_year != "Phases"
     and ((analysis_scope == "Institutes" and cdc_filtered.empty) or (analysis_scope != "Institutes" and filtered_df.empty and cdc_filtered.empty))
 ):
     st.markdown(
@@ -1585,13 +1593,13 @@ if (
 
 metric_1, metric_2, metric_3, metric_4 = st.columns(4)
 with metric_1:
-    if dashboard_year == "All years":
+    if dashboard_year == "Phases":
         current_year_count = all_year_total_requests - last_year_filtered_requests
         device_kpi_note = (
-            f"{fmt_number(current_year_count)} current + {fmt_number(last_year_filtered_requests)} last year"
+            f"{fmt_number(current_year_count)} Phase 2 + {fmt_number(last_year_filtered_requests)} Phase 1"
         )
     else:
-        device_kpi_note = "Selected current-year demand"
+        device_kpi_note = "Selected Phase 2 demand"
     if kpi_basis == "Institutes":
         render_metric(
             "Device count",
@@ -1605,7 +1613,7 @@ with metric_1:
     else:
         render_metric("Device count", fmt_number(display_total_requests), device_kpi_note)
 with metric_2:
-    if dashboard_year == "All years":
+    if dashboard_year == "Phases":
         render_metric("Learners covered", fmt_number(scope_count_value), f"{fmt_number(total_districts)} districts")
     elif kpi_basis == "Institutes":
         render_metric("Institutes covered", fmt_number(institute_count), f"{fmt_number(institute_districts)} districts")
@@ -1620,8 +1628,8 @@ with metric_2:
     else:
         render_metric("Schools covered", fmt_number(total_schools), f"{fmt_number(total_districts)} districts")
 with metric_3:
-    if dashboard_year == "All years":
-        render_metric("Years combined", "2", "Current year + last year")
+    if dashboard_year == "Phases":
+        render_metric("Phases combined", "2", "Phase 2 + Phase 1")
     elif kpi_basis == "Institutes":
         render_metric("Institute districts", fmt_number(institute_districts), "Filtered institute locations")
     elif kpi_basis == "Bedridden":
@@ -1639,8 +1647,8 @@ with metric_3:
             f"{fmt_percent(priority_value, total_requests)} of selected requests.",
         )
 with metric_4:
-    if dashboard_year == "All years":
-        render_metric("Most needed device", top_device, "Combined all-year demand")
+    if dashboard_year == "Phases":
+        render_metric("Most needed device", top_device, "Combined phase demand")
     elif kpi_basis == "Institutes":
         render_metric("Most needed device", top_device, "Institute demand")
     elif kpi_basis == "Bedridden":
@@ -2010,7 +2018,7 @@ with size_tab:
 with data_tab:
     st.markdown('<div class="section-title">Filtered data</div>', unsafe_allow_html=True)
 
-    data_display_df = all_year_demand_df if dashboard_year == "All years" else filtered_df
+    data_display_df = all_year_demand_df if dashboard_year == "Phases" else filtered_df
     st.dataframe(data_display_df, hide_index=True, width="stretch")
 
     csv = data_display_df.to_csv(index=False).encode("utf-8")
