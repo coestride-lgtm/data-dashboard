@@ -1287,6 +1287,15 @@ cdc_requests = int(cdc_filtered["Requests"].sum()) if not cdc_filtered.empty els
 school_requests = len(school_filtered_df)
 bedridden_requests = len(bedridden_filtered_df)
 analysis_requests = len(filtered_df)
+analysis_phase_one_units = int(
+    filtered_df.loc[filtered_df["Collection Year"].eq(YEAR_LAST), "Device Units"]
+    .fillna(0)
+    .sum()
+) if "Device Units" in filtered_df.columns and "Collection Year" in filtered_df.columns else 0
+analysis_phase_one_request_rows = int(
+    filtered_df["Collection Year"].eq(YEAR_LAST).sum()
+) if "Collection Year" in filtered_df.columns else 0
+analysis_request_units = analysis_requests - analysis_phase_one_request_rows + analysis_phase_one_units
 
 analysis_device_counts = filtered_df["Device"].value_counts() if not filtered_df.empty else pd.Series(dtype="int64")
 school_device_counts = school_filtered_df["Device"].value_counts() if not school_filtered_df.empty else pd.Series(dtype="int64")
@@ -1351,6 +1360,8 @@ else:
         scope_count_label = "institutes"
     else:
         total_requests = analysis_requests + (institute_requests if analysis_scope == "Combined" else 0)
+        if collection_year == YEAR_ALL and analysis_scope == "Combined":
+            total_requests = analysis_request_units + institute_requests
         active_device_counts = combined_device_counts if analysis_scope == "Combined" else analysis_device_counts
         top_device = display_device_name(active_device_counts.idxmax()) if not active_device_counts.empty else "No data"
         if analysis_scope == "Bedridden":
@@ -1436,7 +1447,7 @@ with metric_1:
         render_metric("Device requests", fmt_number(total_requests), "Selected school records")
     else:
         device_note = (
-            "Selected school, bedridden, institute, and last-year demand"
+            "Selected Phase 2 requests plus Phase 1 device units"
             if analysis_scope == "Combined" and collection_year == YEAR_ALL
             else "Selected school, bedridden, and institute demand"
             if analysis_scope == "Combined"
@@ -1856,4 +1867,3 @@ with data_tab:
         file_name="filtered_device_data.csv",
         mime="text/csv",
     )
-
