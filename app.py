@@ -1,10 +1,12 @@
 from datetime import datetime
 from html import escape
+from io import BytesI0
 from pathlib import Path
 import re
 
 import pandas as pd
 import plotly.express as px
+import requests
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
@@ -1859,7 +1861,9 @@ with size_tab:
 with data_tab:
     st.markdown('<div class="section-title">Filtered data</div>', unsafe_allow_html=True)
 
-    st.dataframe(filtered_df, hide_index=True, width="stretch")
+    data_display_df = all_year_demand_df if dashboard_year == "Phases" else filtered_df
+    st.dataframe(data_display_df, hide_index=True, width="stretch")
+
     csv = data_display_df.to_csv(index=False).encode("utf-8")
     st.download_button(
         label="Download filtered CSV",
