@@ -1860,7 +1860,7 @@ with size_tab:
 with data_tab:
     st.markdown('<div class="section-title">Filtered data</div>', unsafe_allow_html=True)
 
-    data_display_df = all_year_demand_df if dashboard_year == "Phases" else filtered_df
+    data_display_df = cdc_filtered if analysis_scope == "Institutes" else filtered_df
     st.dataframe(data_display_df, hide_index=True, width="stretch")
 
     csv = data_display_df.to_csv(index=False).encode("utf-8")
