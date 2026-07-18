@@ -1,6 +1,5 @@
 from datetime import datetime
 from html import escape
-from io import BytesI0
 from pathlib import Path
 import re
 
